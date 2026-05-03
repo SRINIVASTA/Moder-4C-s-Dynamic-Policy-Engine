@@ -55,5 +55,12 @@ This project is a custom-built, cloud-hosted solution designed to meet the speci
    ```
 3. Launch the app:
    ```bash
+
+
+---
+
+### 👨‍💻 Developed by Srinivasta
+**Data Scientist** | *Focused on Automating the Future of Underwriting.*
+
    streamlit run app.py
    ```
