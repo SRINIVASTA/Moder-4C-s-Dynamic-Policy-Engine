@@ -92,7 +92,7 @@ def create_pdf_report(counts_df, app_rate):
     pdf.set_font("helvetica", size=8)
     pdf.cell(0, 10, txt=f"Audit Timestamp: {report_date}", ln=True, align='R')
     
-    # Body
+    # Body Title
     pdf.set_text_color(0, 0, 0)
     pdf.ln(10)
     pdf.set_font("helvetica", 'B', 16)
@@ -106,13 +106,14 @@ def create_pdf_report(counts_df, app_rate):
     pdf.cell(10, 10, txt="", border=0)
     pdf.cell(90, 10, txt=f"Approval Rate: {app_rate}%", border='B', ln=True)
     
-    # Table
+    # Table Header
     pdf.ln(10)
     pdf.set_font("helvetica", 'B', 10)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(140, 10, txt="Policy Logic Gate Breakdown", border=1, fill=True)
     pdf.cell(50, 10, txt="Count", border=1, fill=True, ln=True)
     
+    # Table Content
     pdf.set_font("helvetica", size=10)
     for reason, count in counts_df.items():
         if reason != 'Approved':
@@ -128,7 +129,7 @@ def create_pdf_report(counts_df, app_rate):
     pdf.cell(90, 5, txt="Tanakala AI System Audit", align='L')
     pdf.cell(90, 5, txt="Authorized Senior Underwriter", ln=1, align='R')
     
-    # Seal
+    # Verification Seal
     pdf.set_y(-55)
     pdf.set_x(85)
     pdf.set_font("helvetica", 'B', 8)
@@ -151,23 +152,34 @@ with col1:
     st.write("---")
     st.write("**💡 Policy Bottleneck Analysis (Audit View)**")
     decline_reasons = counts[counts.index != 'Approved']
-    st.table(decline_reasons) if not decline_reasons.empty else st.success("100% Approval!")
+    
+    # Corrected table logic to prevent DeltaGenerator error
+    if not decline_reasons.empty:
+        st.table(decline_reasons)
+    else:
+        st.success("✅ 100% Approval achieved!")
 
 with col2:
     st.subheader("Portfolio Performance")
     app_count = counts.get('Approved', 0)
     app_rate = round((app_count/len(df_base)*100), 1)
+    
     st.metric("Total Applications", len(df_base))
     st.metric("Approved Loans", app_count)
     st.metric("Approval Rate", f"{app_rate}%")
     
     st.divider()
+    
+    # CSV Download
     csv = df_base[df_base['Decision'] == 'Approved'].to_csv(index=False).encode('utf-8')
     st.download_button("📥 Export Approved_Batch.csv", data=csv, file_name="Approved_Batch.csv", use_container_width=True)
     
-    # PDF Button
-    pdf_bytes = create_pdf_report(counts, app_rate)
-    st.download_button("📄 Download Tanakala Audit PDF", data=pdf_bytes, file_name="Audit_Report.pdf", mime="application/pdf", use_container_width=True)
+    # PDF Download with Tanakala Branding
+    try:
+        pdf_bytes = create_pdf_report(counts, app_rate)
+        st.download_button("📄 Download Tanakala Audit PDF", data=pdf_bytes, file_name="Audit_Report.pdf", mime="application/pdf", use_container_width=True)
+    except Exception as e:
+        st.error("⚠️ PDF Error: Ensure 'fpdf2' is in requirements.txt")
 
 # ==========================================
 # 7. JD MAPPING & AUDIT PREVIEW
@@ -176,7 +188,10 @@ st.divider()
 c1, c2 = st.columns(2)
 with c1:
     with st.expander("📌 View JD Requirement Mapping", expanded=True):
-        st.table({"JD Requirement": ["Well-versed with all 4C’s", "Min 3 years Experience", "Night Shift Reliability"], "Project Solution": ["Logic Gates for FICO, DTI, LTV", "Validated via Kaggle Risk Data", "Automated PDF Audit Logging"]})
+        st.table({
+            "JD Requirement": ["Well-versed with all 4C’s", "Min 3 years Experience", "Night Shift Reliability"], 
+            "Project Solution": ["Logic Gates for FICO, DTI, LTV", "Validated via US Risk Data", "Automated PDF Audit Logging"]
+        })
 with c2:
     with st.expander("🎓 4C's Logic Definitions"):
         st.write("- **Credit:** FICO Score check\n- **Capacity:** DTI ratio check\n- **Collateral:** LTV Ratio check\n- **Capital:** Employment history check")
@@ -186,4 +201,5 @@ def color_decision(val):
     color = '#d4edda' if val == 'Approved' else '#f8d7da'
     return f'background-color: {color}'
 
+# Using .map() for Pandas compatibility
 st.dataframe(df_base.head(10).style.map(color_decision, subset=['Decision']), use_container_width=True)
