@@ -3,12 +3,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from fpdf import FPDF
+from datetime import datetime
 import io
 
 # ==========================================
 # 1. PAGE SETUP & HEADER
 # ==========================================
-st.set_page_config(page_title="Risk Policy Simulator", layout="wide")
+st.set_page_config(page_title="Tanakala AI | Risk Policy Simulator", layout="wide")
 st.title("📊 Mortgage Underwriting Policy Simulator")
 st.markdown("""
 This simulator measures how deviations from **Standard Agency Guidelines** 
@@ -23,6 +24,7 @@ def load_data(uploaded_file):
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
     else:
+        # Fallback dummy data for simulation
         np.random.seed(42)
         data = {
             'loan_amnt': np.random.randint(10000, 500000, 1000),
@@ -40,6 +42,7 @@ def load_data(uploaded_file):
         df['FICO_Score'] = 580 + (df['cb_person_cred_hist_length'] * 8)
     return df
 
+st.sidebar.header("📁 Data Source")
 file = st.sidebar.file_uploader("Upload 'credit_risk_dataset.csv'", type=["csv"])
 df_base = load_data(file)
 
@@ -52,7 +55,7 @@ dti_val = st.sidebar.slider('Maximum DTI Cap (Capacity)', 0.10, 0.70, 0.43, step
 emp_val = st.sidebar.slider('Min Employment (Stability)', 0, 10, 2)
 
 # ==========================================
-# 4. DECISION ENGINE
+# 4. DECISION ENGINE (4C's Logic)
 # ==========================================
 def apply_policy(row):
     if 'cb_person_default_on_file' in row and row['cb_person_default_on_file'] == 'Y':
@@ -132,6 +135,7 @@ def create_pdf_report(counts_df, app_rate):
     pdf.cell(40, 12, txt="VERIFIED COMPLIANT", border=1, align='C')
 
     return bytes(pdf.output())
+
 # ==========================================
 # 6. DASHBOARD DISPLAY
 # ==========================================
@@ -147,10 +151,7 @@ with col1:
     st.write("---")
     st.write("**💡 Policy Bottleneck Analysis (Audit View)**")
     decline_reasons = counts[counts.index != 'Approved']
-    if not decline_reasons.empty:
-        st.table(decline_reasons)
-    else:
-        st.success("100% Approval!")
+    st.table(decline_reasons) if not decline_reasons.empty else st.success("100% Approval!")
 
 with col2:
     st.subheader("Portfolio Performance")
@@ -161,16 +162,12 @@ with col2:
     st.metric("Approval Rate", f"{app_rate}%")
     
     st.divider()
-    # CSV Export
     csv = df_base[df_base['Decision'] == 'Approved'].to_csv(index=False).encode('utf-8')
     st.download_button("📥 Export Approved_Batch.csv", data=csv, file_name="Approved_Batch.csv", use_container_width=True)
     
-    # PDF Export (FIXED)
-    try:
-        pdf_bytes = create_pdf_report(counts, app_rate)
-        st.download_button("📄 Download PDF Audit Summary", data=pdf_bytes, file_name="Audit_Summary.pdf", mime="application/pdf", use_container_width=True)
-    except Exception as e:
-        st.error("Wait! Did you add 'fpdf2' to your requirements.txt?")
+    # PDF Button
+    pdf_bytes = create_pdf_report(counts, app_rate)
+    st.download_button("📄 Download Tanakala Audit PDF", data=pdf_bytes, file_name="Audit_Report.pdf", mime="application/pdf", use_container_width=True)
 
 # ==========================================
 # 7. JD MAPPING & AUDIT PREVIEW
@@ -179,7 +176,7 @@ st.divider()
 c1, c2 = st.columns(2)
 with c1:
     with st.expander("📌 View JD Requirement Mapping", expanded=True):
-        st.table({"JD Requirement": ["Well-versed with all 4C’s", "Min 3 years Experience", "Night Shift Reliability"], "Project Solution": ["Logic Gates for FICO, DTI, LTV", "Validated via Kaggle Risk Data", "Automated Audit & PDF/CSV Exports"]})
+        st.table({"JD Requirement": ["Well-versed with all 4C’s", "Min 3 years Experience", "Night Shift Reliability"], "Project Solution": ["Logic Gates for FICO, DTI, LTV", "Validated via Kaggle Risk Data", "Automated PDF Audit Logging"]})
 with c2:
     with st.expander("🎓 4C's Logic Definitions"):
         st.write("- **Credit:** FICO Score check\n- **Capacity:** DTI ratio check\n- **Collateral:** LTV Ratio check\n- **Capital:** Employment history check")
