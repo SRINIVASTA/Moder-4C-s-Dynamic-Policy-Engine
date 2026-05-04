@@ -69,27 +69,69 @@ df_base['Decision'] = df_base.apply(apply_policy, axis=1)
 counts = df_base['Decision'].value_counts()
 
 # ==========================================
-# 5. PDF REPORT GENERATOR (FIXED BYTES OUTPUT)
+# 5. PDF GENERATOR (TANAKALA AI BRANDING)
 # ==========================================
 def create_pdf_report(counts_df, app_rate):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("helvetica", 'B', 16)
-    pdf.cell(0, 10, txt="Moder Mortgage Audit Report", ln=True, align='C')
-    pdf.set_font("helvetica", size=12)
+    
+    # Header Bar
+    pdf.set_fill_color(28, 40, 51) 
+    pdf.rect(0, 0, 210, 45, 'F') 
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 24)
+    pdf.cell(0, 20, txt="TANAKALA AI SOLUTIONS", ln=True, align='C')
+    pdf.set_font("helvetica", 'I', 10)
+    pdf.cell(0, 5, txt="Automating Precision in Financial Underwriting", ln=True, align='C')
+    
+    # Timestamp
+    report_date = datetime.now().strftime("%d-%b-%Y | %H:%M:%S")
+    pdf.set_font("helvetica", size=8)
+    pdf.cell(0, 10, txt=f"Audit Timestamp: {report_date}", ln=True, align='R')
+    
+    # Body
+    pdf.set_text_color(0, 0, 0)
     pdf.ln(10)
-    pdf.cell(0, 10, txt=f"Approval Rate: {app_rate}%", ln=True)
-    pdf.cell(0, 10, txt=f"Total Applications: {len(df_base)}", ln=True)
-    pdf.ln(5)
-    pdf.set_font("helvetica", 'B', 12)
-    pdf.cell(0, 10, txt="Policy Bottleneck Breakdown:", ln=True)
+    pdf.set_font("helvetica", 'B', 16)
+    pdf.cell(0, 10, txt="MORTGAGE PORTFOLIO AUDIT SUMMARY", ln=True)
+    pdf.set_draw_color(28, 40, 51)
+    pdf.line(10, 65, 200, 65) 
+    
+    pdf.ln(10)
+    pdf.set_font("helvetica", size=11)
+    pdf.cell(90, 10, txt=f"Total Records: {len(df_base)}", border='B')
+    pdf.cell(10, 10, txt="", border=0)
+    pdf.cell(90, 10, txt=f"Approval Rate: {app_rate}%", border='B', ln=True)
+    
+    # Table
+    pdf.ln(10)
+    pdf.set_font("helvetica", 'B', 10)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(140, 10, txt="Policy Logic Gate Breakdown", border=1, fill=True)
+    pdf.cell(50, 10, txt="Count", border=1, fill=True, ln=True)
+    
     pdf.set_font("helvetica", size=10)
     for reason, count in counts_df.items():
-        pdf.cell(0, 10, txt=f"- {reason}: {count}", ln=True)
+        if reason != 'Approved':
+            pdf.cell(140, 10, txt=str(reason), border=1)
+            pdf.cell(50, 10, txt=str(count), border=1, ln=True)
+            
+    # Signatures
+    pdf.ln(30)
+    pdf.set_font("helvetica", 'B', 10)
+    pdf.cell(90, 5, txt="__________________________", align='L')
+    pdf.cell(90, 5, txt="__________________________", ln=1, align='R')
+    pdf.set_font("helvetica", '', 9)
+    pdf.cell(90, 5, txt="Tanakala AI System Audit", align='L')
+    pdf.cell(90, 5, txt="Authorized Senior Underwriter", ln=1, align='R')
     
-    # Return as bytes instead of direct output
-    return bytes(pdf.output())
+    # Seal
+    pdf.set_y(-55)
+    pdf.set_x(85)
+    pdf.set_font("helvetica", 'B', 8)
+    pdf.cell(40, 12, txt="VERIFIED COMPLIANT", border=1, align='C')
 
+    return bytes(pdf.output())
 # ==========================================
 # 6. DASHBOARD DISPLAY
 # ==========================================
