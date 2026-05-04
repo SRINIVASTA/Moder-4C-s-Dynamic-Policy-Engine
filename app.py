@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from fpdf import FPDF
 from datetime import datetime
 import io
@@ -55,7 +55,7 @@ dti_val = st.sidebar.slider('Maximum DTI Cap (Capacity)', 0.10, 0.70, 0.43, step
 emp_val = st.sidebar.slider('Min Employment (Stability)', 0, 10, 2)
 
 # ==========================================
-# 4. DECISION ENGINE (4C's Logic)
+# 4. DECISION ENGINE
 # ==========================================
 def apply_policy(row):
     if 'cb_person_default_on_file' in row and row['cb_person_default_on_file'] == 'Y':
@@ -92,7 +92,7 @@ def create_pdf_report(counts_df, app_rate):
     pdf.set_font("helvetica", size=8)
     pdf.cell(0, 10, txt=f"Audit Timestamp: {report_date}", ln=True, align='R')
     
-    # Body Title
+    # Body
     pdf.set_text_color(0, 0, 0)
     pdf.ln(10)
     pdf.set_font("helvetica", 'B', 16)
@@ -106,14 +106,13 @@ def create_pdf_report(counts_df, app_rate):
     pdf.cell(10, 10, txt="", border=0)
     pdf.cell(90, 10, txt=f"Approval Rate: {app_rate}%", border='B', ln=True)
     
-    # Table Header
+    # Table
     pdf.ln(10)
     pdf.set_font("helvetica", 'B', 10)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(140, 10, txt="Policy Logic Gate Breakdown", border=1, fill=True)
     pdf.cell(50, 10, txt="Count", border=1, fill=True, ln=True)
     
-    # Table Content
     pdf.set_font("helvetica", size=10)
     for reason, count in counts_df.items():
         if reason != 'Approved':
@@ -129,7 +128,7 @@ def create_pdf_report(counts_df, app_rate):
     pdf.cell(90, 5, txt="Tanakala AI System Audit", align='L')
     pdf.cell(90, 5, txt="Authorized Senior Underwriter", ln=1, align='R')
     
-    # Verification Seal
+    # Seal
     pdf.set_y(-55)
     pdf.set_x(85)
     pdf.set_font("helvetica", 'B', 8)
@@ -138,22 +137,26 @@ def create_pdf_report(counts_df, app_rate):
     return bytes(pdf.output())
 
 # ==========================================
-# 6. DASHBOARD DISPLAY
+# 6. 3D-STYLE DASHBOARD DISPLAY
 # ==========================================
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Approval vs. Decline Breakdown")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    colors = ['#2ecc71', '#e74c3c', '#f39c12', '#3498db', '#9b59b6']
-    ax.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=140, colors=colors[:len(counts)])
-    st.pyplot(fig)
+    st.subheader("3D Approval vs. Decline Analysis")
+    # Interactive 3D Donut Chart
+    fig = go.Figure(data=[go.Pie(
+        labels=counts.index, 
+        values=counts.values, 
+        hole=.4,
+        pull=[0.1, 0, 0, 0, 0], # Emphasize Approved
+        marker=dict(colors=['#2ecc71', '#e74c3c', '#f39c12', '#3498db', '#9b59b6'])
+    )])
+    fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), showlegend=True)
+    st.plotly_chart(fig, use_container_width=True)
     
     st.write("---")
     st.write("**💡 Policy Bottleneck Analysis (Audit View)**")
     decline_reasons = counts[counts.index != 'Approved']
-    
-    # Corrected table logic to prevent DeltaGenerator error
     if not decline_reasons.empty:
         st.table(decline_reasons)
     else:
@@ -169,12 +172,10 @@ with col2:
     st.metric("Approval Rate", f"{app_rate}%")
     
     st.divider()
-    
-    # CSV Download
     csv = df_base[df_base['Decision'] == 'Approved'].to_csv(index=False).encode('utf-8')
     st.download_button("📥 Export Approved_Batch.csv", data=csv, file_name="Approved_Batch.csv", use_container_width=True)
     
-    # PDF Download with Tanakala Branding
+    # PDF Button
     try:
         pdf_bytes = create_pdf_report(counts, app_rate)
         st.download_button("📄 Download Tanakala Audit PDF", data=pdf_bytes, file_name="Audit_Report.pdf", mime="application/pdf", use_container_width=True)
@@ -188,10 +189,7 @@ st.divider()
 c1, c2 = st.columns(2)
 with c1:
     with st.expander("📌 View JD Requirement Mapping", expanded=True):
-        st.table({
-            "JD Requirement": ["Well-versed with all 4C’s", "Min 3 years Experience", "Night Shift Reliability"], 
-            "Project Solution": ["Logic Gates for FICO, DTI, LTV", "Validated via US Risk Data", "Automated PDF Audit Logging"]
-        })
+        st.table({"JD Requirement": ["Well-versed with all 4C’s", "Min 3 years Experience", "Night Shift Reliability"], "Project Solution": ["Logic Gates for FICO, DTI, LTV", "Validated via US Risk Data", "Automated PDF Audit Logging"]})
 with c2:
     with st.expander("🎓 4C's Logic Definitions"):
         st.write("- **Credit:** FICO Score check\n- **Capacity:** DTI ratio check\n- **Collateral:** LTV Ratio check\n- **Capital:** Employment history check")
@@ -201,5 +199,4 @@ def color_decision(val):
     color = '#d4edda' if val == 'Approved' else '#f8d7da'
     return f'background-color: {color}'
 
-# Using .map() for Pandas compatibility
 st.dataframe(df_base.head(10).style.map(color_decision, subset=['Decision']), use_container_width=True)
