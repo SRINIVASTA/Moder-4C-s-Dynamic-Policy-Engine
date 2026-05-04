@@ -21,7 +21,7 @@ def load_data(uploaded_file):
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
     else:
-        # Fallback to dummy data matching your image headers
+        # Fallback dummy data
         np.random.seed(42)
         data = {
             'loan_amnt': np.random.randint(10000, 500000, 1000),
@@ -33,19 +33,18 @@ def load_data(uploaded_file):
         }
         df = pd.DataFrame(data)
     
-    # Clean column names
     df.columns = df.columns.str.strip()
     
-    # --- COLLATERAL: LTV CALCULATION ---
+    # COLLATERAL: LTV CALCULATION
     df['LTV_Ratio'] = (df['loan_amnt'] / (df['loan_amnt'] / 0.8)) * 100
     
-    # --- CREDIT: FICO PROXY ---
+    # CREDIT: FICO PROXY
     if 'FICO_Score' not in df.columns:
         df['FICO_Score'] = 580 + (df['cb_person_cred_hist_length'] * 8)
     
     return df
 
-# Sidebar for Upload
+# Sidebar for Data Source
 st.sidebar.header("📁 Data Source")
 file = st.sidebar.file_uploader("Upload 'credit_risk_dataset.csv'", type=["csv"])
 df_base = load_data(file)
@@ -90,6 +89,15 @@ with col1:
     colors = ['#2ecc71', '#e74c3c', '#f39c12', '#3498db', '#9b59b6']
     ax.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=140, colors=colors[:len(counts)])
     st.pyplot(fig)
+    
+    # --- NEW: Policy Bottleneck Table ---
+    st.write("---")
+    st.write("**💡 Policy Bottleneck Analysis (Audit View)**")
+    decline_reasons = counts[counts.index != 'Approved']
+    if not decline_reasons.empty:
+        st.table(decline_reasons)
+    else:
+        st.success("Current policy allows 100% approval!")
 
 with col2:
     st.subheader("Portfolio Performance")
@@ -101,10 +109,10 @@ with col2:
     st.divider()
     # Automated Export Logic
     csv = df_base[df_base['Decision'] == 'Approved'].to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Export Approved_Batch.csv", data=csv, file_name="Approved_Batch.csv")
+    st.download_button("📥 Export Approved_Batch.csv", data=csv, file_name="Approved_Batch.csv", use_container_width=True)
 
 # ==========================================
-# 6. JD REQUIREMENT MAPPING & DATA PREVIEW
+# 6. JD MAPPING & ENHANCED PREVIEW
 # ==========================================
 st.divider()
 c1, c2 = st.columns(2)
@@ -125,5 +133,13 @@ with c2:
         - **Capital/Stability:** Employment history length check.
         """)
 
+# --- NEW: Color Highlighted Audit Table ---
 st.subheader("📋 Audit Preview (Top 10 Rows)")
-st.dataframe(df_base.head(10), use_container_width=True)
+def color_decision(val):
+    color = '#d4edda' if val == 'Approved' else '#f8d7da' # Professional green/red
+    return f'background-color: {color}'
+
+st.dataframe(
+    df_base.head(10).style.applymap(color_decision, subset=['Decision']), 
+    use_container_width=True
+)
