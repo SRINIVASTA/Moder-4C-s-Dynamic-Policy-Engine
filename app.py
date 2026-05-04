@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from fpdf import FPDF
+import io
 
 # ==========================================
 # 1. PAGE SETUP & HEADER
@@ -21,7 +23,6 @@ def load_data(uploaded_file):
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
     else:
-        # Fallback dummy data for portfolio simulation
         np.random.seed(42)
         data = {
             'loan_amnt': np.random.randint(10000, 500000, 1000),
@@ -34,18 +35,11 @@ def load_data(uploaded_file):
         df = pd.DataFrame(data)
     
     df.columns = df.columns.str.strip()
-    
-    # COLLATERAL: LTV CALCULATION (80% LTV Baseline)
     df['LTV_Ratio'] = (df['loan_amnt'] / (df['loan_amnt'] / 0.8)) * 100
-    
-    # CREDIT: FICO PROXY Calculation
     if 'FICO_Score' not in df.columns:
         df['FICO_Score'] = 580 + (df['cb_person_cred_hist_length'] * 8)
-    
     return df
 
-# Sidebar for Data Source
-st.sidebar.header("📁 Data Source")
 file = st.sidebar.file_uploader("Upload 'credit_risk_dataset.csv'", type=["csv"])
 df_base = load_data(file)
 
@@ -58,19 +52,15 @@ dti_val = st.sidebar.slider('Maximum DTI Cap (Capacity)', 0.10, 0.70, 0.43, step
 emp_val = st.sidebar.slider('Min Employment (Stability)', 0, 10, 2)
 
 # ==========================================
-# 4. DECISION ENGINE (4C's Logic)
+# 4. DECISION ENGINE
 # ==========================================
 def apply_policy(row):
-    # CHARACTER Check
     if 'cb_person_default_on_file' in row and row['cb_person_default_on_file'] == 'Y':
         return 'Declined (Character - Prior Default)'
-    # CAPACITY Check
     if row['loan_percent_income'] > dti_val:
         return 'Declined (Capacity - High DTI)'
-    # CREDIT Check
     if row['FICO_Score'] < fico_val:
         return 'Declined (Credit - Low FICO)'
-    # STABILITY Check
     if row['person_emp_length'] < emp_val:
         return 'Declined (Stability - Short Work History)'
     return 'Approved'
@@ -79,69 +69,75 @@ df_base['Decision'] = df_base.apply(apply_policy, axis=1)
 counts = df_base['Decision'].value_counts()
 
 # ==========================================
-# 5. DASHBOARD DISPLAY
+# 5. PDF REPORT GENERATOR (NEW FEATURE)
+# ==========================================
+def create_pdf_report(counts_df, app_rate):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt="Moder Mortgage Audit Report", ln=True, align='C')
+    pdf.set_font("Arial", size=12)
+    pdf.ln(10)
+    pdf.cell(200, 10, txt=f"Approval Rate: {app_rate}%", ln=True)
+    pdf.cell(200, 10, txt=f"Total Applications: {len(df_base)}", ln=True)
+    pdf.ln(5)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(200, 10, txt="Policy Bottleneck Breakdown:", ln=True)
+    pdf.set_font("Arial", size=10)
+    for reason, count in counts_df.items():
+        pdf.cell(200, 10, txt=f"- {reason}: {count}", ln=True)
+    
+    return pdf.output()
+
+# ==========================================
+# 6. DASHBOARD DISPLAY
 # ==========================================
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Approval vs. Decline Breakdown")
     fig, ax = plt.subplots(figsize=(10, 6))
-    # Professional Underwriting Colors
     colors = ['#2ecc71', '#e74c3c', '#f39c12', '#3498db', '#9b59b6']
     ax.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=140, colors=colors[:len(counts)])
     st.pyplot(fig)
     
-    # Policy Bottleneck Analysis for Auditors
     st.write("---")
     st.write("**💡 Policy Bottleneck Analysis (Audit View)**")
     decline_reasons = counts[counts.index != 'Approved']
-    if not decline_reasons.empty:
-        st.table(decline_reasons)
-    else:
-        st.success("Current policy allows 100% approval!")
+    st.table(decline_reasons) if not decline_reasons.empty else st.success("100% Approval!")
 
 with col2:
     st.subheader("Portfolio Performance")
     app_count = counts.get('Approved', 0)
-    st.metric("Total Applications Processed", len(df_base))
+    app_rate = round((app_count/len(df_base)*100), 1)
+    st.metric("Total Applications", len(df_base))
     st.metric("Approved Loans", app_count)
-    st.metric("Approval Rate", f"{(app_count/len(df_base)*100):.1f}%")
+    st.metric("Approval Rate", f"{app_rate}%")
     
     st.divider()
-    # Automated Export for Night-Shift Batch Processing
+    # CSV Export
     csv = df_base[df_base['Decision'] == 'Approved'].to_csv(index=False).encode('utf-8')
     st.download_button("📥 Export Approved_Batch.csv", data=csv, file_name="Approved_Batch.csv", use_container_width=True)
+    
+    # PDF Export (NEW)
+    pdf_data = create_pdf_report(counts, app_rate)
+    st.download_button("📄 Download PDF Audit Summary", data=pdf_data, file_name="Audit_Summary.pdf", mime="application/pdf", use_container_width=True)
 
 # ==========================================
-# 6. JD MAPPING & COLOR-CODED PREVIEW
+# 7. JD MAPPING & AUDIT PREVIEW
 # ==========================================
 st.divider()
 c1, c2 = st.columns(2)
-
 with c1:
     with st.expander("📌 View JD Requirement Mapping", expanded=True):
-        st.table({
-            "JD Requirement": ["Well-versed with all 4C’s", "Min 3 years Experience", "Night Shift Reliability"],
-            "Project Solution": ["Logic Gates for FICO, DTI, LTV", "Validated via Kaggle Risk Data", "Automated Audit & CSV Exports"]
-        })
-
+        st.table({"JD Requirement": ["Well-versed with all 4C’s", "Min 3 years Experience", "Night Shift Reliability"], "Project Solution": ["Logic Gates for FICO, DTI, LTV", "Validated via Kaggle Risk Data", "Automated Audit & PDF/CSV Exports"]})
 with c2:
     with st.expander("🎓 4C's Logic Definitions"):
-        st.write("""
-        - **Credit:** FICO Score check (Slider controlled).
-        - **Capacity:** Debt-to-Income (DTI) ratio check.
-        - **Collateral:** Loan-to-Value (LTV) Ratio calculation.
-        - **Capital/Stability:** Employment history length check.
-        """)
+        st.write("- **Credit:** FICO Score check\n- **Capacity:** DTI ratio check\n- **Collateral:** LTV Ratio check\n- **Capital:** Employment history check")
 
-# --- Professional Audit Table Styling ---
 st.subheader("📋 Audit Preview (Top 10 Rows)")
 def color_decision(val):
-    color = '#d4edda' if val == 'Approved' else '#f8d7da' # Professional green/red
+    color = '#d4edda' if val == 'Approved' else '#f8d7da'
     return f'background-color: {color}'
 
-# Using .map() to avoid AttributeError in newer Pandas versions
-st.dataframe(
-    df_base.head(10).style.map(color_decision, subset=['Decision']), 
-    use_container_width=True
-)
+st.dataframe(df_base.head(10).style.map(color_decision, subset=['Decision']), use_container_width=True)
