@@ -3,3 +3,4 @@ numpy
 matplotlib
 streamlit
 fpdf2
+plotly
