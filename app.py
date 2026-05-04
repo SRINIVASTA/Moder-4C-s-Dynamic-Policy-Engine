@@ -69,25 +69,26 @@ df_base['Decision'] = df_base.apply(apply_policy, axis=1)
 counts = df_base['Decision'].value_counts()
 
 # ==========================================
-# 5. PDF REPORT GENERATOR (NEW FEATURE)
+# 5. PDF REPORT GENERATOR (FIXED BYTES OUTPUT)
 # ==========================================
 def create_pdf_report(counts_df, app_rate):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, txt="Moder Mortgage Audit Report", ln=True, align='C')
-    pdf.set_font("Arial", size=12)
+    pdf.set_font("helvetica", 'B', 16)
+    pdf.cell(0, 10, txt="Moder Mortgage Audit Report", ln=True, align='C')
+    pdf.set_font("helvetica", size=12)
     pdf.ln(10)
-    pdf.cell(200, 10, txt=f"Approval Rate: {app_rate}%", ln=True)
-    pdf.cell(200, 10, txt=f"Total Applications: {len(df_base)}", ln=True)
+    pdf.cell(0, 10, txt=f"Approval Rate: {app_rate}%", ln=True)
+    pdf.cell(0, 10, txt=f"Total Applications: {len(df_base)}", ln=True)
     pdf.ln(5)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 10, txt="Policy Bottleneck Breakdown:", ln=True)
-    pdf.set_font("Arial", size=10)
+    pdf.set_font("helvetica", 'B', 12)
+    pdf.cell(0, 10, txt="Policy Bottleneck Breakdown:", ln=True)
+    pdf.set_font("helvetica", size=10)
     for reason, count in counts_df.items():
-        pdf.cell(200, 10, txt=f"- {reason}: {count}", ln=True)
+        pdf.cell(0, 10, txt=f"- {reason}: {count}", ln=True)
     
-    return pdf.output()
+    # Return as bytes instead of direct output
+    return bytes(pdf.output())
 
 # ==========================================
 # 6. DASHBOARD DISPLAY
@@ -104,7 +105,10 @@ with col1:
     st.write("---")
     st.write("**💡 Policy Bottleneck Analysis (Audit View)**")
     decline_reasons = counts[counts.index != 'Approved']
-    st.table(decline_reasons) if not decline_reasons.empty else st.success("100% Approval!")
+    if not decline_reasons.empty:
+        st.table(decline_reasons)
+    else:
+        st.success("100% Approval!")
 
 with col2:
     st.subheader("Portfolio Performance")
@@ -119,9 +123,12 @@ with col2:
     csv = df_base[df_base['Decision'] == 'Approved'].to_csv(index=False).encode('utf-8')
     st.download_button("📥 Export Approved_Batch.csv", data=csv, file_name="Approved_Batch.csv", use_container_width=True)
     
-    # PDF Export (NEW)
-    pdf_data = create_pdf_report(counts, app_rate)
-    st.download_button("📄 Download PDF Audit Summary", data=pdf_data, file_name="Audit_Summary.pdf", mime="application/pdf", use_container_width=True)
+    # PDF Export (FIXED)
+    try:
+        pdf_bytes = create_pdf_report(counts, app_rate)
+        st.download_button("📄 Download PDF Audit Summary", data=pdf_bytes, file_name="Audit_Summary.pdf", mime="application/pdf", use_container_width=True)
+    except Exception as e:
+        st.error("Wait! Did you add 'fpdf2' to your requirements.txt?")
 
 # ==========================================
 # 7. JD MAPPING & AUDIT PREVIEW
